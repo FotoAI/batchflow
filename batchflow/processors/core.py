@@ -33,7 +33,6 @@ class ModelProcessor(ProcessorNode):
             self.model_path = model_path
         elif model_source is not None:
             self.model_path = self.download_model(model_source)
-        self._batch_size = 1
         self.model = None
 
     def preprocess(self, image: np.asarray):
@@ -69,10 +68,4 @@ class ModelProcessor(ProcessorNode):
 
         return model_path
 
-    @property
-    def batch_size(self):
-        return self._batch_size
-
-    @batch_size.setter
-    def batch_size(self, batch_size):
-        self._batch_size = batch_size
+    

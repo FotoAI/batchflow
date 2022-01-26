@@ -39,6 +39,7 @@ class Node:
         self.state_attributes.extend(["_name", "progress"])
         self._logger = self._configure_logger()
         self._logger.debug(f"Created Node with id {self._id}")
+        self._batch_size = 1
         if mode in MODE:
             self.mode = MODE
         else:
@@ -186,6 +187,14 @@ class Node:
         Returns a set of the child nodes
         """
         return set(self._children)
+
+    @property
+    def batch_size(self):
+        return self._batch_size
+
+    @batch_size.setter
+    def batch_size(self, batch_size):
+        self._batch_size = batch_size
 
 
 class Leaf(Node):
@@ -410,8 +419,8 @@ class ProducerNode(Node):
         in a multiprocessing setting.
     """
 
-    def __init__(self, mode=BATCH, *args, **kwargs):
-        super(ProducerNode, self).__init__(mode=mode, *args, **kwargs)
+    def __init__(self, *args, **kwargs):
+        super(ProducerNode, self).__init__(*args, **kwargs)
 
     def restore(self):
         p = 0
@@ -427,3 +436,12 @@ class ProducerNode(Node):
         and a call to self.next happens.
         """
         raise NotImplementedError("Method needs to be implemented by subclass")
+
+    def next_batch(self)-> any:
+        """
+        Returns batch of next elements
+        Raises ``StopIteration`` after the last element has been produced
+        and a call to self.next happens.
+        """
+        raise NotImplementedError("Method needs to be implemented by subclass")
+        
