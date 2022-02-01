@@ -12,7 +12,7 @@ with open(os.path.join(HERE, "README.md")) as fid:
     README = fid.read()
 
 __version__ = None  # set __version__ in this exec() call
-exec(open('batchflow/version.py').read())
+exec(open("batchflow/version.py").read())
 # This call to setup() does all the work
 
 setup(
@@ -43,6 +43,6 @@ setup(
         "requests==2.23.0",
         # "tenacity==6.1.0",
         "catalogue==2.0.0",
-        "boto3==1.12.18"
-    ]
+        "boto3==1.12.18",
+    ],
 )

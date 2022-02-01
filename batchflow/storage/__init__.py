@@ -1,22 +1,36 @@
 _storage_obj = dict()
 
-def get_storage(name, *args, **kwargs):
-    global _storage_obj 
+
+def _init_storage(name, *args, **kwargs):
     if name == "backblaze":
         from .backblaze import BackBlazeStorage
-        if _storage_obj.get("backblaze", None) is None:
-            obj = BackBlazeStorage(*args, **kwargs)
-            _storage_obj["backblaze"] = obj
-            return obj
-        else:
-            return _storage_obj["backblaze"]
-    elif name=="gdrive":
+
+        storage_obj = BackBlazeStorage(*args, **kwargs)
+
+    elif name == "gdrive" or name=="google_drive":
         from .gdrive import GDriveStorage
-        if _storage_obj.get("gdrive", None) is None:
-            obj = GDriveStorage(*args, **kwargs)
-            _storage_obj["gdrive"] = obj
-            return obj
-        else:
-            return _storage_obj["gdrive"]
+
+        storage_obj = GDriveStorage(*args, **kwargs)
+
     else:
         raise Exception(f"{name} storage not found")
+    return storage_obj
+
+
+def get_storage(name, force=False, temp=False, *args, **kwargs):
+    global _storage_obj
+
+    if not force:
+        storage_obj = _storage_obj.get(name, None)
+        if storage_obj:
+            return storage_obj
+        else:
+            storage_obj = _init_storage(name,*args, **kwargs)
+            if not temp:
+                _storage_obj[name] = storage_obj
+    else:
+        storage_obj = _init_storage(name,*args, **kwargs)
+        if not temp:
+            _storage_obj[name] = storage_obj
+
+    return storage_obj

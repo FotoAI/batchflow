@@ -8,7 +8,14 @@ from batchflow.decorators import log_time
 
 
 class ImageFolderReader(ProducerNode):
-    def __init__(self, path: Union[str,List[str]], formats:Optional[List[str]]=None, max: int=-1, *args, **kwargs):
+    def __init__(
+        self,
+        path: Union[str, List[str]],
+        formats: Optional[List[str]] = None,
+        max: int = -1,
+        *args,
+        **kwargs,
+    ):
         """
         Reads image from folder
 
@@ -20,47 +27,65 @@ class ImageFolderReader(ProducerNode):
         super().__init__(*args, **kwargs)
         self.path = path
         if not formats:
-            self.formats = ["jpg", "jpeg", "png", "JPG", "JPEG", "bmp", "webp"]
+            self.formats = [".jpg", ".jpeg", ".png", ".JPG", ".JPEG"]
         else:
             self.formats = formats
         _formats = ",".join(self.formats)
-        self.images = glob.glob(os.path.join(path, f"*[{_formats}]"))
+        self.images = [
+            p
+            for p in glob.glob(os.path.join(path, f"*"))
+            if self._is_image_file(os.path.basename(p))
+        ]
         self.max = max
+
+    def _is_image_file(self, filename):
+        if os.path.splitext(filename)[-1] in self.formats:
+            return True
+        return False
 
     def __len__(self):
         return len(self.images)
 
     def open(self):
         self._idx = 0
-        self._max_idx = len(self.images) if self.max == -1 else self.max
-        self._logger.info(f"Producing {self._max_idx} images")
-        if self._max_idx == 0:
+        if len(self.images) == 0:
             _formats = ",".join(self.formats)
-            raise Exception(f"Zero images in the folder {self.path} with extension {_formats}  ")
-    
+            raise Exception(
+                f"Zero images in the folder {self.path} with extension {_formats}  "
+            )
+
+        self._max_idx = (
+            len(self.images) if self.max == -1 else min(len(self.images), self.max)
+        )
+        self._logger.info(f"Producing {self._max_idx} images")
+
     def close(self):
         self._idx = 0
-    
+
     def _read_image(self) -> np.array:
         if self._idx < self._max_idx:
             img_path = self.images[self._idx]
+            self._logger.debug(f"producing {img_path}")
             image = cv2.imread(img_path)
             # BGR to RGB
-            image = image[...,::-1]
+            image = image[..., ::-1]
             self._idx += 1
             return img_path, image
         else:
             raise StopIteration()
 
-    @log_time    
+    @log_time
     def next(self) -> np.array:
         img_path, image = self._read_image()
-        return {"image":image, "filename":os.path.basename(img_path), "filepath":img_path}
-
+        return {
+            "image": image,
+            "filename": os.path.basename(img_path),
+            "filepath": img_path,
+        }
 
     @log_time
     def next_batch(self) -> any:
-        image_batch = {"image":[], "filename":[], "filepath":[], "batch_size":0}
+        image_batch = {"image": [], "filename": [], "filepath": [], "batch_size": 0}
         self._end_batch = False
 
         for i in range(self.batch_size):
@@ -69,14 +94,11 @@ class ImageFolderReader(ProducerNode):
                 image_batch["image"].append(image)
                 image_batch["filename"].append(os.path.basename(img_path))
                 image_batch["filepath"].append(img_path)
-                image_batch["batch_size"]+=1
+                image_batch["batch_size"] += 1
             except StopIteration:
                 self._end_batch = True
                 break
-        if image_batch["batch_size"]>0:
+        if image_batch["batch_size"] > 0:
             return image_batch
         else:
             raise StopIteration
-            
-
-    

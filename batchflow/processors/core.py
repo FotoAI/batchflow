@@ -67,5 +67,3 @@ class ModelProcessor(ProcessorNode):
             raise Exception(f"Storage {source} not supported for model download")
 
         return model_path
-
-    

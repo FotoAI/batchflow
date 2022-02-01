@@ -4,7 +4,7 @@ from pathlib import Path
 from batchflow import constants as C
 import loguru
 
-logger= loguru.logger
+logger = loguru.logger
 
 
 class BaseStorage:
@@ -16,7 +16,6 @@ class BaseStorage:
         if not os.path.isdir(root):
             logger.info(f"Creating model download directory {root}")
             os.makedirs(root, exist_ok=True)
-        
 
     def get_download_root(self) -> str:
         download_root = os.path.join(C.BATCHFLOW_HOME, C.MODEL_DOWNLOAD_FOLDER)
@@ -35,6 +34,3 @@ class BaseStorage:
     @abstractmethod
     def upload(self):
         NotImplementedError("Implement this method in subclass")
-
-
-

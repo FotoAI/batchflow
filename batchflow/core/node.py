@@ -437,11 +437,10 @@ class ProducerNode(Node):
         """
         raise NotImplementedError("Method needs to be implemented by subclass")
 
-    def next_batch(self)-> any:
+    def next_batch(self) -> any:
         """
         Returns batch of next elements
         Raises ``StopIteration`` after the last element has been produced
         and a call to self.next happens.
         """
         raise NotImplementedError("Method needs to be implemented by subclass")
-        
