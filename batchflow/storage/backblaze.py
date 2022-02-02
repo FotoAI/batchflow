@@ -40,12 +40,12 @@ class BackBlazeStorage(BaseStorage):
             info = InMemoryAccountInfo()  # store credentials, tokens and cache in memor
             BackBlazeStorage.b2_api = B2Api(info)
             
-            b2_application_key_id = os.getenv("b2_application_key_id", None)
-            b2_application_key = os.getenv("b2_application_key", None)
+            b2_application_key_id = os.getenv("B2_APPLICATION_KEY_ID", None)
+            b2_application_key = os.getenv("B2_APPLICATION_KEY", None)
             if b2_application_key is None:
-                raise Exception("set your b2_application_key_id in environment")
+                raise Exception("set your B2_APPLICATION_KEY_ID in environment")
             if b2_application_key is None:
-                raise Exception("set your b2_application_key in environment")
+                raise Exception("set your B2_APPLICATION_KEY in environment")
 
             BackBlazeStorage.b2_api.authorize_account(
                 "production", b2_application_key_id, b2_application_key
