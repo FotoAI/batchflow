@@ -13,7 +13,7 @@ try:
     SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
 
 except:
-    raise Exception("Install gdrive to use GDriveStorage, `pip install gdrive`")
+    raise Exception("Install gdrive to use GDriveStorage, `pip install gdown and pip install google-api-python-client==2.36.0`")
 import os
 import cv2 as cv
 import numpy as np

@@ -30,12 +30,6 @@ class ImageFolderReader(ProducerNode):
             self.formats = [".jpg", ".jpeg", ".png", ".JPG", ".JPEG"]
         else:
             self.formats = formats
-        _formats = ",".join(self.formats)
-        self.images = [
-            p
-            for p in glob.glob(os.path.join(path, f"*"))
-            if self._is_image_file(os.path.basename(p))
-        ]
         self.max = max
 
     def _is_image_file(self, filename):
@@ -47,6 +41,12 @@ class ImageFolderReader(ProducerNode):
         return len(self.images)
 
     def open(self):
+        self.images = [
+            p
+            for p in glob.glob(os.path.join(self.path, f"*"))
+            if self._is_image_file(os.path.basename(p))
+        ]
+
         self._idx = 0
         if len(self.images) == 0:
             _formats = ",".join(self.formats)

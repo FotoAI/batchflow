@@ -61,30 +61,55 @@ class BackBlazeStorage(BaseStorage):
         )
         return f"b2://{self.bucket_name}/{key}"
 
-    def download(self,output, key=None, id=None) -> str:
+
+    # download files from b2
+    def download(self,output, key=None, id=None, force=False) -> str:
         if self.bucket is None:
             logger.error(f"Call authenticate() first")
             raise Exception("Call authenticate first")
 
-        if key is not None:
-            self._download_by_key(key=key,output=output )
-
+        if self.isfile(output):
+            logger.info(f"File {output} already exist pass force=True to force download")
+        
+        elif (self.isfile(output) and force) or (not self.isfile(output)):
+            if key is not None:
+                self._download_by_key(key=key,output=output )
             
+            elif id is not None:
+                self._download_by_id(id=id, output=output)
+            
+            else:
+                raise Exception("provide id or key to download the file")
 
-    # download files from b2
-    def _download_by_key(self, key, output):
-        if not self.isfile(output):
-            logger.info(f"downloading b2://{self.bucket_name}/{key} to {output}")
-            download_dest = DownloadDestLocalFile(output)
-            try:
-                self.bucket.download_file_by_name(
-                    file_name=key, download_dest=download_dest
-                )
-            except b2sdk.exception.FileNotPresent:
-                raise FileNotFoundError(
-                    f"File b2://{self.bucket_name}/{key} not found in backblaze"
-                )
         return output
+
+        
+    def _download_by_key(self, key, output):
+        logger.info(f"downloading b2://{self.bucket_name}/{key} to {output}")
+        download_dest = DownloadDestLocalFile(output)
+        try:
+            self.bucket.download_file_by_name(
+                file_name=key, download_dest=download_dest
+            )
+        except b2sdk.exception.FileNotPresent:
+            raise FileNotFoundError(
+                f"File b2://{self.bucket_name}/{key} not found in backblaze"
+            )
+        return output
+
+    def _download_by_id(self, id, output):
+        logger.info(f"downloading by id: {id} to {output}")
+        download_dest = DownloadDestLocalFile(output)
+        try:
+            self.bucket.download_file_by_id(
+                file_id=id, download_dest=download_dest
+            )
+        except b2sdk.exception.FileNotPresent:
+            raise FileNotFoundError(
+                f"File id: {id} not found in backblaze"
+            )
+        return output
+
 
     def list_files(self, key):
         list_files = []
