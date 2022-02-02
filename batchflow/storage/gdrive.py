@@ -104,11 +104,11 @@ class GDriveStorage(BaseStorage):
         
 
     def _get_service(self, creds: Dict[str, str], update_callback=None, fail_callback=None):
-        client_id = os.environ.get("client_id", None)
-        client_secret = os.environ.get("client_secret", None)
+        client_id = os.environ.get("CLIENT_ID", None)
+        client_secret = os.environ.get("CLIENT_SECRET", None)
         if client_id is None or client_secret is None:
-            logger.error(f"client_id or client_secret not found")
-            raise Exception(f"client_id or client_secret not found")
+            logger.error(f"CLIENT_ID or CLIENT_SECRET not found")
+            raise Exception(f"CLIENT_ID or CLIENT_SECRET not found")
 
         creds["client_id"] = client_id
         creds["client_secret"] = client_secret
