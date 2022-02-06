@@ -1,6 +1,7 @@
 from .base import BaseStorage
 import os
 import loguru
+from ..errors import StorageFileNotFound
 
 try:
     from b2sdk.v1 import B2Api
@@ -92,7 +93,7 @@ class BackBlazeStorage(BaseStorage):
                 file_name=key, download_dest=download_dest
             )
         except b2sdk.exception.FileNotPresent:
-            raise FileNotFoundError(
+            raise StorageFileNotFound(
                 f"File b2://{self.bucket_name}/{key} not found in backblaze"
             )
         return output
@@ -105,7 +106,7 @@ class BackBlazeStorage(BaseStorage):
                 file_id=id, download_dest=download_dest
             )
         except b2sdk.exception.FileNotPresent:
-            raise FileNotFoundError(
+            raise StorageFileNotFound(
                 f"File id: {id} not found in backblaze"
             )
         return output
