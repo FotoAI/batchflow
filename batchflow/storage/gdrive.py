@@ -1,27 +1,34 @@
-from http.client import UNAUTHORIZED
-from typing import Callable, List, Optional, Union, Dict
-from .base import BaseStorage
-import loguru
 from concurrent.futures import ThreadPoolExecutor
+from http.client import UNAUTHORIZED
+from typing import Callable, Dict, List, Optional, Union
+
+import loguru
+
 from ..errors import StorageFileNotFound
+from .base import BaseStorage
+
 # from itertools import izip
 
 logger = loguru.logger
 
 try:
     import gdown
-    from googleapiclient.http import MediaIoBaseDownload
-    from googleapiclient.discovery import build
-    from google.oauth2.credentials import Credentials
     from google.auth.transport.requests import Request
-    SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
+    from google.oauth2.credentials import Credentials
+    from googleapiclient.discovery import build
+    from googleapiclient.http import MediaIoBaseDownload
+
+    SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
 
 except:
-    raise Exception("Install gdrive to use GDriveStorage, `pip install gdown and pip install google-api-python-client==2.36.0`")
+    raise Exception(
+        "Install gdrive to use GDriveStorage, `pip install gdown and pip install google-api-python-client==2.36.0`"
+    )
+import io
 import os
+
 import cv2 as cv
 import numpy as np
-import io
 
 
 class GDriveStorage(BaseStorage):
@@ -45,7 +52,15 @@ class GDriveStorage(BaseStorage):
         )
         self._service = self._get_service()
 
-    def download(self, id:Union[str,List[str]]=None, private=False, output:Union[str,List[str]]=None,workers=1, *args, **kwargs) -> str:
+    def download(
+        self,
+        id: Union[str, List[str]] = None,
+        private=False,
+        output: Union[str, List[str]] = None,
+        workers=1,
+        *args,
+        **kwargs,
+    ) -> str:
         if not private:
             logger.debug(f"Downloading from public")
             local_file = self._download_public_file(id=id, *args, **kwargs)
@@ -55,17 +70,20 @@ class GDriveStorage(BaseStorage):
             if isinstance(id, list):
                 # download multiple ids
                 # check output num output same as ids
-                assert len(id)==len(output), "num of output should be same as num ids"
-                merge_arguments = [[_id, _output] for _id,_output in zip(id, output)]
+                assert len(id) == len(output), "num of output should be same as num ids"
+                merge_arguments = [[_id, _output] for _id, _output in zip(id, output)]
                 with ThreadPoolExecutor(max_workers=workers) as executor:
-                    results = executor.map(self._download_access_protected_file,*zip(*merge_arguments))
+                    results = executor.map(
+                        self._download_access_protected_file, *zip(*merge_arguments)
+                    )
                 return [r for r in results]
             else:
                 logger.debug(f"Downloading access protected file")
-                local_file = self._download_access_protected_file(id=id, service=self._service, *args, **kwargs)
+                local_file = self._download_access_protected_file(
+                    id=id, service=self._service, *args, **kwargs
+                )
 
                 return local_file
-
 
     # TODO: do not pass full local path
     def _download_public_file(
@@ -112,26 +130,27 @@ class GDriveStorage(BaseStorage):
                     status, done = downloader.next_chunk()
                 fh.seek(0)
                 # file_bytes = np.asarray(bytearray(fh.read()), dtype=np.uint8)
-                with open(output,"wb") as f:
+                with open(output, "wb") as f:
                     f.write(fh.read())
                 logger.info(f"downloaded file to {output}")
                 return output
                 # img = cv.imdecode(file_bytes, cv.IMREAD_COLOR)
             else:
-                logger.error("Cannot download access protected files, Call authenticate first")
+                logger.error(
+                    "Cannot download access protected files, Call authenticate first"
+                )
                 raise Exception(
                     "Cannot download access protected files, Call authenticate first"
                 )
-                
+
         except Exception as e:
             logger.error(e)
             return False
-        
 
     def _get_service(self):
         if self._credentials is None:
             raise UNAUTHORIZED("Authenticate storage first")
-        return build("drive",version="v3", credentials=self._credentials)
+        return build("drive", version="v3", credentials=self._credentials)
 
     def _get_credentials(
         self, creds: Dict[str, str], update_callback=None, fail_callback=None

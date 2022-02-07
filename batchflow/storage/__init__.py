@@ -7,7 +7,7 @@ def _init_storage(name, *args, **kwargs):
 
         storage_obj = BackBlazeStorage(*args, **kwargs)
 
-    elif name == "gdrive" or name=="google_drive":
+    elif name == "gdrive" or name == "google_drive":
         from .gdrive import GDriveStorage
 
         storage_obj = GDriveStorage(*args, **kwargs)
@@ -25,11 +25,11 @@ def get_storage(name, force=False, temp=False, *args, **kwargs):
         if storage_obj:
             return storage_obj
         else:
-            storage_obj = _init_storage(name,*args, **kwargs)
+            storage_obj = _init_storage(name, *args, **kwargs)
             if not temp:
                 _storage_obj[name] = storage_obj
     else:
-        storage_obj = _init_storage(name,*args, **kwargs)
+        storage_obj = _init_storage(name, *args, **kwargs)
         if not temp:
             _storage_obj[name] = storage_obj
 

@@ -1,7 +1,7 @@
-from .utils import has_cycle, topological_sort
-from .node import ProducerNode
-
 import logging
+
+from .node import ProducerNode
+from .utils import has_cycle, topological_sort
 
 logger = logging.getLogger(__package__)
 

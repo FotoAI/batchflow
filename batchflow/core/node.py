@@ -1,6 +1,4 @@
-from __future__ import print_function
-from __future__ import division
-from __future__ import absolute_import
+from __future__ import absolute_import, division, print_function
 
 import loguru
 
@@ -8,10 +6,11 @@ from batchflow.storage.base import BaseStorage
 
 logger = loguru.logger
 
-import numpy as np
-from batchflow.constants import GPU, CPU, DEVICE_TYPES
-from batchflow.constants import BATCH, REALTIME, MODE
 from typing import Any, List
+
+import numpy as np
+
+from batchflow.constants import BATCH, CPU, DEVICE_TYPES, GPU, MODE, REALTIME
 
 
 class Node:

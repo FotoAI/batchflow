@@ -1,5 +1,6 @@
-from batchflow.core.node import ConsumerNode
 import csv
+
+from batchflow.core.node import ConsumerNode
 
 
 class FileAppenderConsumer(ConsumerNode):

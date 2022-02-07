@@ -1,9 +1,11 @@
-from batchflow.core.node import ProducerNode
-from typing import Union, List, Optional
 import glob
 import os
-import numpy as np
+from typing import List, Optional, Union
+
 import cv2
+import numpy as np
+
+from batchflow.core.node import ProducerNode
 from batchflow.decorators import log_time
 
 

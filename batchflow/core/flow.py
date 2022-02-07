@@ -2,9 +2,11 @@ from platform import node
 from typing import List
 
 from loguru import logger
-from .node import ProcessorNode, ConsumerNode, ProducerNode
-from .graph import GraphEngine
+
 from batchflow.decorators import log_time
+
+from .graph import GraphEngine
+from .node import ConsumerNode, ProcessorNode, ProducerNode
 
 
 def _task_data_from_node_tsort(tsort_l):

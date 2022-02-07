@@ -1,8 +1,10 @@
+from typing import Any, Dict, List
+
+import numpy as np
+
 from batchflow.core.node import ProcessorNode
 from batchflow.storage import get_storage
 from batchflow.storage.base import BaseStorage
-import numpy as np
-from typing import Any, List, Dict
 
 
 class ModelProcessor(ProcessorNode):

@@ -1,6 +1,7 @@
 """Setup script for Batchflow"""
 
 import os.path
+
 import setuptools
 from setuptools import setup
 

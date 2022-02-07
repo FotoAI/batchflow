@@ -1,14 +1,13 @@
-from .base import BaseStorage
 import os
+
 import loguru
+
 from ..errors import StorageFileNotFound
+from .base import BaseStorage
 
 try:
-    from b2sdk.v1 import B2Api
-    from b2sdk.v1 import InMemoryAccountInfo
-    from b2sdk.v1 import B2Api
     import b2sdk
-    from b2sdk.v1 import DownloadDestLocalFile
+    from b2sdk.v1 import B2Api, DownloadDestLocalFile, InMemoryAccountInfo
 except:
     raise (
         "Install Backblaze python client to use BackBlazeStorage `pip install b2sdk`"
@@ -26,8 +25,6 @@ class BackBlazeStorage(BaseStorage):
         self.b2_api = None
         self.bucket = None
         self.bucket_name = bucket_name
-        
-        
 
     def authenticate(self):
         logger.info(f"Authenticating BackBlaze")
@@ -40,7 +37,7 @@ class BackBlazeStorage(BaseStorage):
             logger.info("Init singleton b2api object")
             info = InMemoryAccountInfo()  # store credentials, tokens and cache in memor
             BackBlazeStorage.b2_api = B2Api(info)
-            
+
             b2_application_key_id = os.getenv("B2_APPLICATION_KEY_ID", None)
             b2_application_key = os.getenv("B2_APPLICATION_KEY", None)
             if b2_application_key is None:
@@ -53,38 +50,35 @@ class BackBlazeStorage(BaseStorage):
             )
         return BackBlazeStorage.b2_api
 
-
     def upload(self, key, file):
         logger.info(f"uploading {file} to b2://{self.bucket_name}/{key}")
         self.bucket.upload_local_file(file, key)
-        logger.info(
-            f"uploaded successful {file} to b2://{self.bucket_name}/{key}"
-        )
+        logger.info(f"uploaded successful {file} to b2://{self.bucket_name}/{key}")
         return f"b2://{self.bucket_name}/{key}"
 
-
     # download files from b2
-    def download(self,output, key=None, id=None, force=False) -> str:
+    def download(self, output, key=None, id=None, force=False) -> str:
         if self.bucket is None:
             logger.error(f"Call authenticate() first")
             raise Exception("Call authenticate first")
 
         if self.isfile(output):
-            logger.info(f"File {output} already exist pass force=True to force download")
-        
+            logger.info(
+                f"File {output} already exist pass force=True to force download"
+            )
+
         elif (self.isfile(output) and force) or (not self.isfile(output)):
             if key is not None:
-                self._download_by_key(key=key,output=output )
-            
+                self._download_by_key(key=key, output=output)
+
             elif id is not None:
                 self._download_by_id(id=id, output=output)
-            
+
             else:
                 raise Exception("provide id or key to download the file")
 
         return output
 
-        
     def _download_by_key(self, key, output):
         logger.info(f"downloading b2://{self.bucket_name}/{key} to {output}")
         download_dest = DownloadDestLocalFile(output)
@@ -102,15 +96,10 @@ class BackBlazeStorage(BaseStorage):
         logger.info(f"downloading by id: {id} to {output}")
         download_dest = DownloadDestLocalFile(output)
         try:
-            self.bucket.download_file_by_id(
-                file_id=id, download_dest=download_dest
-            )
+            self.bucket.download_file_by_id(file_id=id, download_dest=download_dest)
         except b2sdk.exception.FileNotPresent:
-            raise StorageFileNotFound(
-                f"File id: {id} not found in backblaze"
-            )
+            raise StorageFileNotFound(f"File id: {id} not found in backblaze")
         return output
-
 
     def list_files(self, key):
         list_files = []

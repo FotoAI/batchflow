@@ -1,3 +1,2 @@
 class StorageFileNotFound(Exception):
     pass
-
