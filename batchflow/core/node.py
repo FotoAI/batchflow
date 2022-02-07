@@ -2,19 +2,14 @@ from __future__ import print_function
 from __future__ import division
 from __future__ import absolute_import
 
-import sys
-from tkinter import EXCEPTION
 import loguru
 
 from batchflow.storage.base import BaseStorage
 
 logger = loguru.logger
 
-import pickle
 import numpy as np
 from batchflow.constants import GPU, CPU, DEVICE_TYPES
-import boto3
-import os
 from batchflow.constants import BATCH, REALTIME, MODE
 from typing import Any, List
 
@@ -43,7 +38,7 @@ class Node:
         if mode in MODE:
             self.mode = MODE
         else:
-            raise EXCEPTION(f"execution mode: {mode} should be one of {MODE}")
+            raise Exception(f"execution mode: {mode} should be one of {MODE}")
         # self._configure_execution_mode()
 
     def _configure_execution_mode(self):
