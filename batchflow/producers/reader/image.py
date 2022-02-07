@@ -1,3 +1,4 @@
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 import glob
 import os
 from typing import List, Optional, Union
@@ -7,7 +8,14 @@ import numpy as np
 
 from batchflow.core.node import ProducerNode
 from batchflow.decorators import log_time
+from loguru import logger
 
+def _read_image(img_path) -> np.array:
+    logger.debug(f"producing {img_path}")
+    image = cv2.imread(img_path)
+    # BGR to RGB
+    image = image[..., ::-1]
+    return img_path, image
 
 class ImageFolderReader(ProducerNode):
     def __init__(
@@ -59,6 +67,7 @@ class ImageFolderReader(ProducerNode):
         self._max_idx = (
             len(self.images) if self.max == -1 else min(len(self.images), self.max)
         )
+        self.images_arr = np.array(self.images)
         self._logger.info(f"Producing {self._max_idx} images")
 
     def close(self):
@@ -90,17 +99,18 @@ class ImageFolderReader(ProducerNode):
         image_batch = {"image": [], "filename": [], "filepath": [], "batch_size": 0}
         self._end_batch = False
 
-        for i in range(self.batch_size):
-            try:
-                img_path, image = self._read_image()
+        # for i in range(self.batch_size):
+        img_paths = self.images_arr[self._idx: self._idx+self.batch_size]
+        self._idx += len(img_paths)
+        if len(img_paths)!=0:
+            with ThreadPoolExecutor(self.batch_size) as e:
+                images = e.map(_read_image, img_paths)
+            
+            for img_path, image in images:
                 image_batch["image"].append(image)
                 image_batch["filename"].append(os.path.basename(img_path))
                 image_batch["filepath"].append(img_path)
                 image_batch["batch_size"] += 1
-            except StopIteration:
-                self._end_batch = True
-                break
-        if image_batch["batch_size"] > 0:
             return image_batch
         else:
             raise StopIteration
