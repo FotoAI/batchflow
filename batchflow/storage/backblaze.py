@@ -1,9 +1,11 @@
 import os
+from typing import List
 
 import loguru
 
 from ..errors import StorageFileNotFound
 from .base import BaseStorage
+from concurrent.futures import ThreadPoolExecutor
 
 try:
     import b2sdk
@@ -57,27 +59,38 @@ class BackBlazeStorage(BaseStorage):
         return f"b2://{self.bucket_name}/{key}"
 
     # download files from b2
-    def download(self, output, key=None, id=None, force=False) -> str:
+    def download(
+        self, output, key=None, id=None, force=False, workers=3, **kwargs
+    ) -> str:
         if self.bucket is None:
             logger.error(f"Call authenticate() first")
             raise Exception("Call authenticate first")
 
-        if self.isfile(output):
-            logger.info(
-                f"File {output} already exist pass force=True to force download"
-            )
-
-        elif (self.isfile(output) and force) or (not self.isfile(output)):
-            if key is not None:
-                self._download_by_key(key=key, output=output)
-
-            elif id is not None:
-                self._download_by_id(id=id, output=output)
-
+        if id:
+            if isinstance(id, list):
+                assert len(id) == len(output), "num of output should be same as num ids"
+                merge_arguments = [[_id, _output] for _id, _output in zip(id, output)]
+                with ThreadPoolExecutor(max_workers=workers) as executor:
+                    results = executor.map(self._download_by_id, *zip(*merge_arguments))
+                return [r for r in results]
             else:
-                raise Exception("provide id or key to download the file")
+                return self._download_by_id(id=id, output=output)
+        elif key:
+            if isinstance(key, list):
+                assert len(key) == len(
+                    output
+                ), "num of output should be same as num ids"
+                merge_arguments = [[_id, _output] for _id, _output in zip(id, output)]
+                with ThreadPoolExecutor(max_workers=workers) as executor:
+                    results = executor.map(
+                        self._download_by_key, *zip(*merge_arguments)
+                    )
+                return [r for r in results]
+            else:
+                return self._download_by_key(key=key, output=output)
 
-        return output
+        else:
+            raise Exception("Pass key or id")
 
     def _download_by_key(self, key, output):
         logger.info(f"downloading b2://{self.bucket_name}/{key} to {output}")
