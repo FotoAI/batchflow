@@ -103,15 +103,22 @@ class BackBlazeStorage(BaseStorage):
             raise StorageFileNotFound(
                 f"File b2://{self.bucket_name}/{key} not found in backblaze"
             )
+        except b2sdk.exception.BadRequest:
+            logger.error(f"Failed to download file id {id}, raise b2sdk.exception.BadRequest Exception")
         return output
 
-    def _download_by_id(self, id, output):
+    def _download_by_id(self, id, output, retry=2, attempt=0):
         logger.info(f"downloading by id: {id} to {output}")
         download_dest = DownloadDestLocalFile(output)
         try:
             self.bucket.download_file_by_id(file_id=id, download_dest=download_dest)
         except b2sdk.exception.FileNotPresent:
             raise StorageFileNotFound(f"File id: {id} not found in backblaze")
+        except b2sdk.exception.BadRequest:
+            # if attempt<retry:
+            #     self._download_by_id(id, output, retry=retry, attempt=attempt+1)
+            logger.error(f"Failed to download file id {id}, raise b2sdk.exception.BadRequest Exception")
+            
         return output
 
     def list_files(self, key):
