@@ -35,7 +35,6 @@ setup(
         "six>=1.9.0",
         "loguru==0.5.3",
         "Pillow>=6.2.0",
-        "shapely==1.7.0",
         "requests>=2.23.0",
         "catalogue==2.0.0",
         "boto3>=1.12.18",
