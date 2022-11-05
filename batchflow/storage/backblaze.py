@@ -21,7 +21,7 @@ logger = loguru.logger
 class BackBlazeStorage(BaseStorage):
     b2_api = None
 
-    def __init__(self, bucket_name: str, application_key_id: Optional[str] = None, application_key: Optional[str] = None):
+    def __init__(self, bucket_name: str, application_key_id: Optional[str] = None, application_key: Optional[str] = None, force_new=False):
         super().__init__()
         logger.info(f"Init backblazestorage")
         self.b2_api = None
@@ -29,18 +29,20 @@ class BackBlazeStorage(BaseStorage):
         self.bucket_name = bucket_name
         self.application_key_id  =application_key_id
         self.application_key = application_key
+        self.force_new = force_new
 
     def authenticate(self):
         logger.info(f"Authenticating BackBlaze")
-        self.b2_api = self.get_b2_api()
+        self.b2_api = self.get_b2_api(self.application_key_id, self.application_key ,self.force_new)
         self.bucket = self.b2_api.get_bucket_by_name(self.bucket_name)
 
     @staticmethod
-    def get_b2_api(application_key_id,application_key):
-        if BackBlazeStorage.b2_api is None:
+    def get_b2_api(application_key_id,application_key,force_new):
+
+        if BackBlazeStorage.b2_api is None or force_new:
             logger.info("Init singleton b2api object")
             info = InMemoryAccountInfo()  # store credentials, tokens and cache in memor
-            BackBlazeStorage.b2_api = B2Api(info)
+            b2_api = B2Api(info)
             if application_key_id:
                 b2_application_key_id = application_key_id 
                 logger.info("Overring application key id")
@@ -60,10 +62,15 @@ class BackBlazeStorage(BaseStorage):
             if b2_application_key is None:
                 raise Exception("set your B2_APPLICATION_KEY in environment")
 
-            BackBlazeStorage.b2_api.authorize_account(
+            b2_api.authorize_account(
                 "production", b2_application_key_id, b2_application_key
             )
-        return BackBlazeStorage.b2_api
+            BackBlazeStorage.b2_api = b2_api
+            
+        if force_new:
+            return b2_api
+        else:
+            return BackBlazeStorage.b2_api
 
     def upload(self, key, file):
         logger.info(f"uploading {file} to b2://{self.bucket_name}/{key}")
