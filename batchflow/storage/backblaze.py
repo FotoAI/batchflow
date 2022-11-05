@@ -1,5 +1,5 @@
 import os
-from typing import List
+from typing import List, Optional
 
 import loguru
 
@@ -21,12 +21,14 @@ logger = loguru.logger
 class BackBlazeStorage(BaseStorage):
     b2_api = None
 
-    def __init__(self, bucket_name: str):
+    def __init__(self, bucket_name: str, application_key_id: Optional[str] = None, application_key: Optional[str] = None):
         super().__init__()
         logger.info(f"Init backblazestorage")
         self.b2_api = None
         self.bucket = None
         self.bucket_name = bucket_name
+        self.application_key_id  =application_key_id
+        self.application_key = application_key
 
     def authenticate(self):
         logger.info(f"Authenticating BackBlaze")
@@ -34,14 +36,25 @@ class BackBlazeStorage(BaseStorage):
         self.bucket = self.b2_api.get_bucket_by_name(self.bucket_name)
 
     @staticmethod
-    def get_b2_api():
+    def get_b2_api(application_key_id,application_key):
         if BackBlazeStorage.b2_api is None:
             logger.info("Init singleton b2api object")
             info = InMemoryAccountInfo()  # store credentials, tokens and cache in memor
             BackBlazeStorage.b2_api = B2Api(info)
+            if application_key_id:
+                b2_application_key_id = application_key_id 
+                logger.info("Overring application key id")
+            else:
+                logger.info("using env application key id")
+                b2_application_key_id =  os.getenv("B2_APPLICATION_KEY_ID", None)
 
-            b2_application_key_id = os.getenv("B2_APPLICATION_KEY_ID", None)
-            b2_application_key = os.getenv("B2_APPLICATION_KEY", None)
+            if application_key:
+                logger.info("Overring application key")
+                b2_application_key = application_key
+            else:
+                logger.info("using env application key")
+                b2_application_key = os.getenv("B2_APPLICATION_KEY", None)
+
             if b2_application_key is None:
                 raise Exception("set your B2_APPLICATION_KEY_ID in environment")
             if b2_application_key is None:
