@@ -78,6 +78,12 @@ class BackBlazeStorage(BaseStorage):
         logger.info(f"uploaded successful {file} to b2://{self.bucket_name}/{key}")
         return f"b2://{self.bucket_name}/{key}"
 
+    def upload2(self, key, file):
+        logger.info(f"uploading {file} to b2://{self.bucket_name}/{key}")
+        file_info = self.bucket.upload_local_file(file, key)
+        logger.info(f"uploaded successful {file} to b2://{self.bucket_name}/{key}")
+        return file_info
+
     # download files from b2
     def download(
         self, output, key=None, id=None, force=False, workers=3, **kwargs
