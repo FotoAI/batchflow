@@ -2,6 +2,7 @@ import os
 from typing import List, Optional
 
 import loguru
+import tenacity
 
 from ..errors import StorageFileNotFound
 from .base import BaseStorage
@@ -17,38 +18,48 @@ except:
 
 logger = loguru.logger
 
+import requests
+
 
 class BackBlazeStorage(BaseStorage):
     b2_api = None
 
-    def __init__(self, bucket_name: str, application_key_id: Optional[str] = None, application_key: Optional[str] = None, force_new=False):
+    def __init__(
+        self,
+        bucket_name: str,
+        application_key_id: Optional[str] = None,
+        application_key: Optional[str] = None,
+        force_new=False,
+    ):
         super().__init__()
         logger.info(f"Init backblazestorage")
         self.b2_api = None
         self.bucket = None
         self.bucket_name = bucket_name
-        self.application_key_id  =application_key_id
+        self.application_key_id = application_key_id
         self.application_key = application_key
         self.force_new = force_new
 
     def authenticate(self):
         logger.info(f"Authenticating BackBlaze")
-        self.b2_api = self.get_b2_api(self.application_key_id, self.application_key ,self.force_new)
+        self.b2_api = self.get_b2_api(
+            self.application_key_id, self.application_key, self.force_new
+        )
         self.bucket = self.b2_api.get_bucket_by_name(self.bucket_name)
 
     @staticmethod
-    def get_b2_api(application_key_id,application_key,force_new):
+    def get_b2_api(application_key_id, application_key, force_new):
 
         if BackBlazeStorage.b2_api is None or force_new:
             logger.info("Init singleton b2api object")
             info = InMemoryAccountInfo()  # store credentials, tokens and cache in memor
             b2_api = B2Api(info)
             if application_key_id:
-                b2_application_key_id = application_key_id 
+                b2_application_key_id = application_key_id
                 logger.info("Overring application key id")
             else:
                 logger.info("using env application key id")
-                b2_application_key_id =  os.getenv("B2_APPLICATION_KEY_ID", None)
+                b2_application_key_id = os.getenv("B2_APPLICATION_KEY_ID", None)
 
             if application_key:
                 logger.info("Overring application key")
@@ -66,7 +77,7 @@ class BackBlazeStorage(BaseStorage):
                 "production", b2_application_key_id, b2_application_key
             )
             BackBlazeStorage.b2_api = b2_api
-            
+
         if force_new:
             return b2_api
         else:
@@ -86,7 +97,7 @@ class BackBlazeStorage(BaseStorage):
 
     # download files from b2
     def download(
-        self, output, key=None, id=None, force=False, workers=3, **kwargs
+        self, output, key=None, id=None, force=False, workers=3, skip_not_found=False
     ) -> str:
         if self.bucket is None:
             logger.error(f"Call authenticate() first")
@@ -95,30 +106,42 @@ class BackBlazeStorage(BaseStorage):
         if id:
             if isinstance(id, list):
                 assert len(id) == len(output), "num of output should be same as num ids"
-                merge_arguments = [[_id, _output] for _id, _output in zip(id, output)]
+                merge_arguments = [
+                    [_id, _output, skip_not_found] for _id, _output in zip(id, output)
+                ]
                 with ThreadPoolExecutor(max_workers=workers) as executor:
                     results = executor.map(self._download_by_id, *zip(*merge_arguments))
                 return [r for r in results]
             else:
-                return self._download_by_id(id=id, output=output)
+                return self._download_by_id(
+                    id=id, output=output, skip_not_found=skip_not_found
+                )
         elif key:
             if isinstance(key, list):
                 assert len(key) == len(
                     output
                 ), "num of output should be same as num ids"
-                merge_arguments = [[_id, _output] for _id, _output in zip(id, output)]
+                merge_arguments = [
+                    [_id, _output, skip_not_found] for _id, _output in zip(id, output)
+                ]
                 with ThreadPoolExecutor(max_workers=workers) as executor:
                     results = executor.map(
                         self._download_by_key, *zip(*merge_arguments)
                     )
                 return [r for r in results]
             else:
-                return self._download_by_key(key=key, output=output)
+                return self._download_by_key(
+                    key=key, output=output, skip_not_found=skip_not_found
+                )
 
         else:
             raise Exception("Pass key or id")
 
-    def _download_by_key(self, key, output):
+    @tenacity.retry(
+        wait=tenacity.wait_exponential(multiplier=1, min=4, max=10),
+        retry=tenacity.retry_if_exception(requests.ReadTimeout),
+    )
+    def _download_by_key(self, key, output, skip_not_found=False):
         logger.info(f"downloading b2://{self.bucket_name}/{key} to {output}")
         download_dest = DownloadDestLocalFile(output)
         try:
@@ -126,25 +149,47 @@ class BackBlazeStorage(BaseStorage):
                 file_name=key, download_dest=download_dest
             )
         except b2sdk.exception.FileNotPresent:
-            raise StorageFileNotFound(
-                f"File b2://{self.bucket_name}/{key} not found in backblaze"
-            )
+            if skip_not_found:
+                logger.error(f"File id: {id} not found in backblaze")
+            else:
+
+                raise StorageFileNotFound(
+                    f"File b2://{self.bucket_name}/{key} not found in backblaze"
+                )
         except b2sdk.exception.BadRequest:
-            logger.error(f"Failed to download file id {id}, raise b2sdk.exception.BadRequest Exception")
+            logger.error(
+                f"Failed to download file id {id}, raise b2sdk.exception.BadRequest Exception"
+            )
         return output
 
-    def _download_by_id(self, id, output, retry=2, attempt=0):
+    @tenacity.retry(
+        wait=tenacity.wait_exponential(multiplier=1, min=4, max=10),
+        retry=tenacity.retry_if_exception_type(
+            requests.ReadTimeout,
+        ),
+    )
+    def _download_by_id(self, id, output, skip_not_found=False):
         logger.info(f"downloading by id: {id} to {output}")
         download_dest = DownloadDestLocalFile(output)
         try:
-            self.bucket.download_file_by_id(file_id=id, download_dest=download_dest)
+            self.bucket.download_file_by_id(
+                file_id=id,
+                download_dest=download_dest,
+            )
         except b2sdk.exception.FileNotPresent:
-            raise StorageFileNotFound(f"File id: {id} not found in backblaze")
+            if skip_not_found:
+                logger.error(f"File id: {id} not found in backblaze")
+            else:
+                raise StorageFileNotFound(f"File id: {id} not found in backblaze")
         except b2sdk.exception.BadRequest:
             # if attempt<retry:
             #     self._download_by_id(id, output, retry=retry, attempt=attempt+1)
-            logger.error(f"Failed to download file id {id}, raise b2sdk.exception.BadRequest Exception")
-            
+            logger.error(
+                f"Failed to download file id {id}, raise b2sdk.exception.BadRequest Exception"
+            )
+        except requests.ReadTimeout:
+            logger.error("Timeout")
+            raise requests.ReadTimeout("Timeout")
         return output
 
     def list_files(self, key):
