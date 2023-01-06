@@ -92,7 +92,9 @@ class BackBlazeStorage(BaseStorage):
     @tenacity.retry(
         stop=tenacity.stop_after_attempt(10),
         wait=tenacity.wait_exponential(multiplier=1, min=4, max=60),
-        retry=tenacity.retry_if_exception(requests.ReadTimeout),
+        retry=tenacity.retry_if_exception_type(
+            (requests.exceptions.ReadTimeout, requests.exceptions.ConnectionError)
+        ),
     )
     def upload2(self, key, file):
         logger.info(f"uploading {file} to b2://{self.bucket_name}/{key}")
@@ -145,7 +147,9 @@ class BackBlazeStorage(BaseStorage):
     @tenacity.retry(
         stop=tenacity.stop_after_attempt(10),
         wait=tenacity.wait_exponential(multiplier=1, min=2, max=4),
-        retry=tenacity.retry_if_exception(requests.ReadTimeout),
+        retry=tenacity.retry_if_exception_type(
+            (requests.exceptions.ReadTimeout, requests.exceptions.ConnectionError)
+        ),
         reraise=False,
     )
     def _download_by_key(self, key, output, skip_not_found=False):
@@ -173,7 +177,7 @@ class BackBlazeStorage(BaseStorage):
         stop=tenacity.stop_after_attempt(10),
         wait=tenacity.wait_exponential(multiplier=1, min=2, max=4),
         retry=tenacity.retry_if_exception_type(
-            requests.ReadTimeout,
+            (requests.exceptions.ReadTimeout, requests.exceptions.ConnectionError)
         ),
         reraise=False,
     )
