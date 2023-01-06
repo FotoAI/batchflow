@@ -89,6 +89,11 @@ class BackBlazeStorage(BaseStorage):
         logger.info(f"uploaded successful {file} to b2://{self.bucket_name}/{key}")
         return f"b2://{self.bucket_name}/{key}"
 
+    @tenacity.retry(
+        stop=tenacity.stop_after_attempt(10),
+        wait=tenacity.wait_exponential(multiplier=1, min=4, max=60),
+        retry=tenacity.retry_if_exception(requests.ReadTimeout),
+    )
     def upload2(self, key, file):
         logger.info(f"uploading {file} to b2://{self.bucket_name}/{key}")
         file_info = self.bucket.upload_local_file(file, key)
@@ -138,8 +143,10 @@ class BackBlazeStorage(BaseStorage):
             raise Exception("Pass key or id")
 
     @tenacity.retry(
-        wait=tenacity.wait_exponential(multiplier=1, min=4, max=10),
+        stop=tenacity.stop_after_attempt(10),
+        wait=tenacity.wait_exponential(multiplier=1, min=2, max=4),
         retry=tenacity.retry_if_exception(requests.ReadTimeout),
+        reraise=False,
     )
     def _download_by_key(self, key, output, skip_not_found=False):
         logger.info(f"downloading b2://{self.bucket_name}/{key} to {output}")
@@ -163,10 +170,12 @@ class BackBlazeStorage(BaseStorage):
         return output
 
     @tenacity.retry(
-        wait=tenacity.wait_exponential(multiplier=1, min=4, max=10),
+        stop=tenacity.stop_after_attempt(10),
+        wait=tenacity.wait_exponential(multiplier=1, min=2, max=4),
         retry=tenacity.retry_if_exception_type(
             requests.ReadTimeout,
         ),
+        reraise=False,
     )
     def _download_by_id(self, id, output, skip_not_found=False):
         logger.info(f"downloading by id: {id} to {output}")
