@@ -83,6 +83,13 @@ class BackBlazeStorage(BaseStorage):
         else:
             return BackBlazeStorage.b2_api
 
+    @tenacity.retry(
+        stop=tenacity.stop_after_attempt(10),
+        wait=tenacity.wait_exponential(multiplier=1, min=4, max=60),
+        retry=tenacity.retry_if_exception_type(
+            (requests.exceptions.ReadTimeout, requests.exceptions.ConnectionError)
+        ),
+    )
     def upload(self, key, file):
         logger.info(f"uploading {file} to b2://{self.bucket_name}/{key}")
         self.bucket.upload_local_file(file, key)
