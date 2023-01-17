@@ -23,30 +23,32 @@ import requests
 
 
 def should_retry(e):
-    return e.should_retry_http()
+    if hasattr(e, "should_retry_http"):
+        return e.should_retry_http()
+    else:
+        return False
 
 
 retry = tenacity.retry(
     stop=tenacity.stop_after_attempt(10),
     wait=tenacity.wait_exponential(multiplier=1, min=4, max=60),
     retry=tenacity.retry_if_exception_type(
-        (
-            requests.exceptions.ReadTimeout,
-            requests.exceptions.ConnectionError,
-            
-        ) 
-    )| tenacity.retry_if_exception(should_retry),
+        (requests.exceptions.ReadTimeout, requests.exceptions.ConnectionError)
+    )
+    | tenacity.retry_if_exception(should_retry),
     reraise=True,
 )
 
 download_retry = tenacity.retry(
-        stop=tenacity.stop_after_attempt(10),
-        wait=tenacity.wait_exponential(multiplier=1, min=2, max=4),
-        retry=tenacity.retry_if_exception_type(
-            (requests.exceptions.ReadTimeout, requests.exceptions.ConnectionError)
-        ) | tenacity.retry_if_exception(should_retry),,
-        reraise=True,
+    stop=tenacity.stop_after_attempt(10),
+    wait=tenacity.wait_exponential(multiplier=1, min=2, max=4),
+    retry=tenacity.retry_if_exception_type(
+        (requests.exceptions.ReadTimeout, requests.exceptions.ConnectionError)
     )
+    | tenacity.retry_if_exception(should_retry),
+    reraise=True,
+)
+
 
 class BackBlazeStorage(BaseStorage):
     b2_api = None
@@ -73,12 +75,11 @@ class BackBlazeStorage(BaseStorage):
             self.application_key_id, self.application_key, self.force_new
         )
 
-        self.bucket = _get_bucket()
+        self.bucket = self._get_bucket()
 
     @retry
     def _get_bucket(self):
         return self.b2_api.get_bucket_by_name(self.bucket_name)
-        
 
     @staticmethod
     def get_b2_api(application_key_id, application_key, force_new):
@@ -172,7 +173,6 @@ class BackBlazeStorage(BaseStorage):
         else:
             raise Exception("Pass key or id")
 
-    
     @download_retry
     def _download_by_key(self, key, output, skip_not_found=False):
         logger.info(f"downloading b2://{self.bucket_name}/{key} to {output}")
