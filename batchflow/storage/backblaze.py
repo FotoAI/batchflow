@@ -11,6 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 try:
     import b2sdk
     from b2sdk.v1 import B2Api, DownloadDestLocalFile, InMemoryAccountInfo
+    from b2sdk import exception
 except:
     raise (
         "Install Backblaze python client to use BackBlazeStorage `pip install b2sdk`"
@@ -19,6 +20,34 @@ except:
 logger = loguru.logger
 
 import requests
+
+
+def should_retry(e):
+    if hasattr(e, "should_retry_http"):
+        return e.should_retry_http()
+    else:
+        return False
+
+
+retry = tenacity.retry(
+    stop=tenacity.stop_after_attempt(10),
+    wait=tenacity.wait_exponential(multiplier=1, min=4, max=60),
+    retry=tenacity.retry_if_exception_type(
+        (requests.exceptions.ReadTimeout, requests.exceptions.ConnectionError)
+    )
+    | tenacity.retry_if_exception(should_retry),
+    reraise=True,
+)
+
+download_retry = tenacity.retry(
+    stop=tenacity.stop_after_attempt(10),
+    wait=tenacity.wait_exponential(multiplier=1, min=2, max=4),
+    retry=tenacity.retry_if_exception_type(
+        (requests.exceptions.ReadTimeout, requests.exceptions.ConnectionError)
+    )
+    | tenacity.retry_if_exception(should_retry),
+    reraise=True,
+)
 
 
 class BackBlazeStorage(BaseStorage):
@@ -45,7 +74,12 @@ class BackBlazeStorage(BaseStorage):
         self.b2_api = self.get_b2_api(
             self.application_key_id, self.application_key, self.force_new
         )
-        self.bucket = self.b2_api.get_bucket_by_name(self.bucket_name)
+
+        self.bucket = self._get_bucket()
+
+    @retry
+    def _get_bucket(self):
+        return self.b2_api.get_bucket_by_name(self.bucket_name)
 
     @staticmethod
     def get_b2_api(application_key_id, application_key, force_new):
@@ -83,26 +117,14 @@ class BackBlazeStorage(BaseStorage):
         else:
             return BackBlazeStorage.b2_api
 
-    @tenacity.retry(
-        stop=tenacity.stop_after_attempt(10),
-        wait=tenacity.wait_exponential(multiplier=1, min=4, max=60),
-        retry=tenacity.retry_if_exception_type(
-            (requests.exceptions.ReadTimeout, requests.exceptions.ConnectionError)
-        ),
-    )
+    @retry
     def upload(self, key, file):
         logger.info(f"uploading {file} to b2://{self.bucket_name}/{key}")
         self.bucket.upload_local_file(file, key)
         logger.info(f"uploaded successful {file} to b2://{self.bucket_name}/{key}")
         return f"b2://{self.bucket_name}/{key}"
 
-    @tenacity.retry(
-        stop=tenacity.stop_after_attempt(10),
-        wait=tenacity.wait_exponential(multiplier=1, min=4, max=60),
-        retry=tenacity.retry_if_exception_type(
-            (requests.exceptions.ReadTimeout, requests.exceptions.ConnectionError)
-        ),
-    )
+    @retry
     def upload2(self, key, file):
         logger.info(f"uploading {file} to b2://{self.bucket_name}/{key}")
         file_info = self.bucket.upload_local_file(file, key)
@@ -151,14 +173,7 @@ class BackBlazeStorage(BaseStorage):
         else:
             raise Exception("Pass key or id")
 
-    @tenacity.retry(
-        stop=tenacity.stop_after_attempt(10),
-        wait=tenacity.wait_exponential(multiplier=1, min=2, max=4),
-        retry=tenacity.retry_if_exception_type(
-            (requests.exceptions.ReadTimeout, requests.exceptions.ConnectionError)
-        ),
-        reraise=False,
-    )
+    @download_retry
     def _download_by_key(self, key, output, skip_not_found=False):
         logger.info(f"downloading b2://{self.bucket_name}/{key} to {output}")
         download_dest = DownloadDestLocalFile(output)
@@ -180,14 +195,7 @@ class BackBlazeStorage(BaseStorage):
             )
         return output
 
-    @tenacity.retry(
-        stop=tenacity.stop_after_attempt(10),
-        wait=tenacity.wait_exponential(multiplier=1, min=2, max=4),
-        retry=tenacity.retry_if_exception_type(
-            (requests.exceptions.ReadTimeout, requests.exceptions.ConnectionError)
-        ),
-        reraise=False,
-    )
+    @download_retry
     def _download_by_id(self, id, output, skip_not_found=False):
         logger.info(f"downloading by id: {id} to {output}")
         download_dest = DownloadDestLocalFile(output)

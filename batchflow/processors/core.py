@@ -54,12 +54,14 @@ class ModelProcessor(ProcessorNode):
             bucket_name = model_source["bucket_name"]
 
             storage: BaseStorage = get_storage("backblaze", bucket_name=bucket_name)
+            storage.authenticate()
 
             model_key: str = model_source["key"]
             filename: str = model_source["filename"]
-            model_path = storage.download(model_key, filename)
+            model_path = storage.download(key=model_key, output=filename)
         elif source == "gdrive":
             storage: BaseStorage = get_storage("gdrive")
+            storage.authenticate()
 
             id = model_source.get("id", None)
             url = model_source.get("url", None)
