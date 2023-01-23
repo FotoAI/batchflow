@@ -7,6 +7,14 @@ from batchflow.decorators import log_time
 
 from .graph import GraphEngine
 from .node import ConsumerNode, ProcessorNode, ProducerNode
+from enum import Enum
+
+
+class FLOW_STATUS(Enum):
+    IDLE = 0
+    RUNNING = 1
+    COMPLETE = 2
+    FAIL = 3
 
 
 def _task_data_from_node_tsort(tsort_l):
@@ -41,8 +49,18 @@ class Flow:
     ) -> None:
         self._graph_engine = GraphEngine(producers, consumers)
         self.batch_size = batch_size
+        self._status = FLOW_STATUS.IDLE
+        self._message = ""
+        self._exception = None
+        self.producers = []
+        self.processors = []
+        self.consumers = []
 
     # TODO: 1. Use graphlib
+
+    @property
+    def status(self):
+        return self._status, self._message, self._exception
 
     @staticmethod
     def _open_nodes(nodes, batch_size):
@@ -67,6 +85,10 @@ class Flow:
         processer: List[ProcessorNode] = o[1]
         consumers: List[ConsumerNode] = o[2]
 
+        self.producers = producers
+        self.processors = processer
+        self.consumers = consumers
+
         # open all tasks
         self._open_nodes(producers, self.batch_size)
         self._open_nodes(processer, self.batch_size)
@@ -78,62 +100,72 @@ class Flow:
             )
 
         last_ctx = None
-        if self.batch_size == 1:
+        self._status = FLOW_STATUS.RUNNING
+        try:
+            if self.batch_size == 1:
 
-            # process the flow sequentially
-            while True:
+                # process the flow sequentially
+                while True:
 
-                # get the producers output
-                ctx = {}
-                try:
-                    for prod_data in producers:
-                        prod = prod_data[0]
-                        out = prod.next()
-                        ctx = {**out, **ctx}
-                except StopIteration:
-                    break
+                    # get the producers output
+                    ctx = {}
+                    try:
+                        for prod_data in producers:
+                            prod = prod_data[0]
+                            out = prod.next()
+                            ctx = {**out, **ctx}
+                    except StopIteration:
+                        break
 
-                # process the unit
-                for proc_data in processer:
-                    proc = proc_data[0]
-                    ctx = proc.process(ctx)
+                    # process the unit
+                    for proc_data in processer:
+                        proc = proc_data[0]
+                        ctx = proc.process(ctx)
 
-                # consume the unit
-                for con_data in consumers:
-                    con = con_data[0]
-                    con.consume(ctx)
+                    # consume the unit
+                    for con_data in consumers:
+                        con = con_data[0]
+                        con.consume(ctx)
 
-                last_ctx = ctx
-        else:
-            # process the flow sequentially
-            while True:
+                    last_ctx = ctx
+            else:
+                # process the flow sequentially
+                while True:
 
-                # get the producers output
-                ctx = {}
-                try:
-                    for prod_data in producers:
-                        prod = prod_data[0]
-                        out = prod.next_batch()
-                        ctx = {**out}
-                except StopIteration:
-                    break
+                    # get the producers output
+                    ctx = {}
+                    try:
+                        for prod_data in producers:
+                            prod = prod_data[0]
+                            out = prod.next_batch()
+                            ctx = {**out}
+                    except StopIteration:
+                        break
 
-                # process the unit
-                for proc_data in processer:
-                    proc = proc_data[0]
-                    ctx = proc.process_batch(ctx)
+                    # process the unit
+                    for proc_data in processer:
+                        proc = proc_data[0]
+                        ctx = proc.process_batch(ctx)
 
-                # consume the unit
-                for con_data in consumers:
-                    con = con_data[0]
-                    con.consume_batch(ctx)
+                    # consume the unit
+                    for con_data in consumers:
+                        con = con_data[0]
+                        con.consume_batch(ctx)
+                    last_ctx = ctx
+            self._status = FLOW_STATUS.COMPLETE
+        except Exception as e:
+            import traceback
 
-                last_ctx = ctx
-
-        # open all tasks
-        self._close_nodes(producers)
-        self._close_nodes(processer)
-        self._close_nodes(consumers)
-        logger.info("Flow Ended Sucessfully")
+            error_message = traceback.format_exc()
+            logger.error(error_message)
+            self._status = FLOW_STATUS.FAIL
+            self._message = error_message
+            self._exception = e
+        finally:
+            # close all tasks
+            self._close_nodes(producers)
+            self._close_nodes(processer)
+            self._close_nodes(consumers)
+            logger.info("Flow Ended Sucessfully")
 
         return last_ctx
