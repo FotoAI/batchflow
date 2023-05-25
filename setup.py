@@ -39,5 +39,6 @@ setup(
         "catalogue==2.0.0",
         "boto3>=1.12.18",
         "tenacity>=8.0.0",
+        "b2sdk==1.21.0"
     ],
 )
