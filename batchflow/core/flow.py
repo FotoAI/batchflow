@@ -75,10 +75,18 @@ class Flow:
             node = node_data[0]
             node.close()
 
-    @log_time
-    def run(self):
-        logger.info("Running Flow...\n\n")
-        logger.info(f"Batch size={self.batch_size}")
+    def open(self):
+        # open all tasks
+        self._open_nodes(self.producers, self.batch_size)
+        self._open_nodes(self.processors, self.batch_size)
+        self._open_nodes(self.consumers, self.batch_size)
+
+    def close(self):
+        self._close_nodes(self.producers)
+        self._close_nodes(self.processors)
+        self._close_nodes(self.consumers)
+
+    def setup(self):
         tsort = self._graph_engine.topological_sort()
         o = _task_data_from_node_tsort(tsort)
         producers: List[ProducerNode] = o[0]
@@ -89,15 +97,18 @@ class Flow:
         self.processors = processer
         self.consumers = consumers
 
-        # open all tasks
-        self._open_nodes(producers, self.batch_size)
-        self._open_nodes(processer, self.batch_size)
-        self._open_nodes(consumers, self.batch_size)
-
-        if len(producers) > 1:
-            logger.warning(
-                f"{len(producers)} producers found, flow will end if any of the producer ends! Make sure they produce same no. of units"
-            )
+    @log_time
+    def run(self, manual=False):
+        logger.info("Running Flow...\n\n")
+        logger.info(f"Batch size={self.batch_size}")
+        
+        if not manual:
+            self.setup()
+            if len(self.producers) > 1:
+                logger.warning(
+                    f"{len(self.producers)} producers found, flow will end if any of the producer ends! Make sure they produce same no. of units"
+                )
+            self.open()
 
         last_ctx = None
         self._status = FLOW_STATUS.RUNNING
@@ -110,7 +121,7 @@ class Flow:
                     # get the producers output
                     ctx = {}
                     try:
-                        for prod_data in producers:
+                        for prod_data in self.producers:
                             prod = prod_data[0]
                             out = prod.next()
                             ctx = {**out, **ctx}
@@ -118,12 +129,12 @@ class Flow:
                         break
 
                     # process the unit
-                    for proc_data in processer:
+                    for proc_data in self.processors:
                         proc = proc_data[0]
                         ctx = proc.process(ctx)
 
                     # consume the unit
-                    for con_data in consumers:
+                    for con_data in self.consumers:
                         con = con_data[0]
                         con.consume(ctx)
 
@@ -132,10 +143,10 @@ class Flow:
                 # process the flow sequentially
                 while True:
 
-                    # get the producers output
+                    # get the self.producers output
                     ctx = {}
                     try:
-                        for prod_data in producers:
+                        for prod_data in self.producers:
                             prod = prod_data[0]
                             out = prod.next_batch()
                             ctx = {**out}
@@ -143,12 +154,12 @@ class Flow:
                         break
 
                     # process the unit
-                    for proc_data in processer:
+                    for proc_data in self.processors:
                         proc = proc_data[0]
                         ctx = proc.process_batch(ctx)
 
                     # consume the unit
-                    for con_data in consumers:
+                    for con_data in self.consumers:
                         con = con_data[0]
                         con.consume_batch(ctx)
                     last_ctx = ctx
@@ -163,9 +174,8 @@ class Flow:
             self._exception = e
         finally:
             # close all tasks
-            self._close_nodes(producers)
-            self._close_nodes(processer)
-            self._close_nodes(consumers)
+            if not manual:
+                self.close()
             logger.info("Flow Ended Sucessfully")
 
         return last_ctx
