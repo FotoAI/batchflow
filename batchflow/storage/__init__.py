@@ -12,6 +12,11 @@ def _init_storage(name, *args, **kwargs):
 
         storage_obj = GDriveStorage(*args, **kwargs)
 
+    elif name == "s3":
+        from .s3 import S3
+
+        storage_obj = S3(*args, **kwargs)
+
     else:
         raise Exception(f"{name} storage not found")
     return storage_obj

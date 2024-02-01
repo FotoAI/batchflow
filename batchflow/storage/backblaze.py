@@ -8,6 +8,7 @@ import tenacity
 from ..errors import StorageFileNotFound
 from .base import BaseStorage
 from concurrent.futures import ThreadPoolExecutor
+import io
 
 try:
     import b2sdk
@@ -71,7 +72,9 @@ class BackBlazeStorage(BaseStorage):
     def authenticate(self):
         logger.info(f"Authenticating BackBlaze")
         self.b2_api = self.get_b2_api(
-            self.application_key_id, self.application_key, self.force_new,
+            self.application_key_id,
+            self.application_key,
+            self.force_new,
         )
 
         self.bucket = self._get_bucket()
@@ -82,18 +85,16 @@ class BackBlazeStorage(BaseStorage):
 
     @staticmethod
     def get_b2_api(application_key_id, application_key, force_new):
-
         if BackBlazeStorage.b2_api is None or force_new:
             logger.info("Init singleton b2api object")
             info = InMemoryAccountInfo()  # store credentials, tokens and cache in memor
-            b2_api = B2Api(info)
+            b2_api = B2Api(info, check_download_hash=False)
             if application_key_id:
                 b2_application_key_id = application_key_id
                 logger.info("Overring application key id")
             else:
                 logger.info("using env application key id")
-                b2_application_key_id = os.getenv(
-                    "B2_APPLICATION_KEY_ID", None)
+                b2_application_key_id = os.getenv("B2_APPLICATION_KEY_ID", None)
 
             if application_key:
                 logger.info("Overring application key")
@@ -103,8 +104,7 @@ class BackBlazeStorage(BaseStorage):
                 b2_application_key = os.getenv("B2_APPLICATION_KEY", None)
 
             if b2_application_key is None:
-                raise Exception(
-                    "set your B2_APPLICATION_KEY_ID in environment")
+                raise Exception("set your B2_APPLICATION_KEY_ID in environment")
             if b2_application_key is None:
                 raise Exception("set your B2_APPLICATION_KEY in environment")
 
@@ -122,21 +122,26 @@ class BackBlazeStorage(BaseStorage):
     def upload(self, key, file):
         logger.info(f"uploading {file} to b2://{self.bucket_name}/{key}")
         self.bucket.upload_local_file(file, key)
-        logger.info(
-            f"uploaded successful {file} to b2://{self.bucket_name}/{key}")
+        logger.info(f"uploaded successful {file} to b2://{self.bucket_name}/{key}")
         return f"b2://{self.bucket_name}/{key}"
 
     @retry
     def upload2(self, key, file):
         logger.info(f"uploading {file} to b2://{self.bucket_name}/{key}")
         file_info = self.bucket.upload_local_file(file, key)
-        logger.info(
-            f"uploaded successful {file} to b2://{self.bucket_name}/{key}")
+        logger.info(f"uploaded successful {file} to b2://{self.bucket_name}/{key}")
         return file_info
 
     # download files from b2
     def download(
-        self, output, key=None, id=None, force=False, workers=3, skip_not_found=False
+        self,
+        output,
+        key=None,
+        id=None,
+        force=False,
+        workers=3,
+        skip_not_found=False,
+        return_false_on_fail=False,
     ) -> str:
         if self.bucket is None:
             logger.error(f"Call authenticate() first")
@@ -144,18 +149,20 @@ class BackBlazeStorage(BaseStorage):
 
         if id:
             if isinstance(id, list):
-                assert len(id) == len(
-                    output), "num of output should be same as num ids"
+                assert len(id) == len(output), "num of output should be same as num ids"
                 merge_arguments = [
-                    [_id, _output, skip_not_found] for _id, _output in zip(id, output)
+                    [_id, _output, skip_not_found, return_false_on_fail]
+                    for _id, _output in zip(id, output)
                 ]
                 with ThreadPoolExecutor(max_workers=workers) as executor:
-                    results = executor.map(
-                        self._download_by_id, *zip(*merge_arguments))
+                    results = executor.map(self._download_by_id, *zip(*merge_arguments))
                 return [r for r in results]
             else:
                 return self._download_by_id(
-                    id=id, output=output, skip_not_found=skip_not_found
+                    id=id,
+                    output=output,
+                    skip_not_found=skip_not_found,
+                    return_false_on_fail=return_false_on_fail,
                 )
         elif key:
             if isinstance(key, list):
@@ -163,7 +170,8 @@ class BackBlazeStorage(BaseStorage):
                     output
                 ), "num of output should be same as num ids"
                 merge_arguments = [
-                    [_id, _output, skip_not_found] for _id, _output in zip(id, output)
+                    [_id, _output, skip_not_found, return_false_on_fail]
+                    for _id, _output in zip(id, output)
                 ]
                 with ThreadPoolExecutor(max_workers=workers) as executor:
                     results = executor.map(
@@ -172,29 +180,32 @@ class BackBlazeStorage(BaseStorage):
                 return [r for r in results]
             else:
                 return self._download_by_key(
-                    key=key, output=output, skip_not_found=skip_not_found
+                    key=key,
+                    output=output,
+                    skip_not_found=skip_not_found,
+                    return_false_on_fail=return_false_on_fail,
                 )
 
         else:
             raise Exception("Pass key or id")
 
     @download_retry
-    def _download_by_key(self, key, output, skip_not_found=False):
+    def _download_by_key(
+        self, key, output, skip_not_found=False, return_false_on_fail=False
+    ):
         logger.info(f"downloading b2://{self.bucket_name}/{key} to {output}")
         # download_dest = DownloadDestLocalFile(output)
         try:
-            downloaded_file = self.bucket.download_file_by_name(
-                file_name=key
-            )
+            downloaded_file = self.bucket.download_file_by_name(file_name=key)
             downloaded_file.save_to(output)
         except b2sdk.exception.FileNotPresent:
             if skip_not_found:
                 logger.error(f"File id: {id} not found in backblaze")
             else:
-
                 raise StorageFileNotFound(
                     f"File b2://{self.bucket_name}/{key} not found in backblaze"
                 )
+
         except b2sdk.exception.BadRequest:
             logger.error(
                 f"Failed to download file id {id}, raise b2sdk.exception.BadRequest Exception"
@@ -202,7 +213,9 @@ class BackBlazeStorage(BaseStorage):
         return output
 
     @download_retry
-    def _download_by_id(self, id, output, skip_not_found=False):
+    def _download_by_id(
+        self, id, output, skip_not_found=False, return_false_on_fail=False
+    ):
         logger.info(f"downloading by id: {id} to {output}")
         # download_dest = DownloadDestLocalFile(output)
         try:
@@ -216,8 +229,7 @@ class BackBlazeStorage(BaseStorage):
             if skip_not_found:
                 logger.error(f"File id: {id} not found in backblaze")
             else:
-                raise StorageFileNotFound(
-                    f"File id: {id} not found in backblaze")
+                raise StorageFileNotFound(f"File id: {id} not found in backblaze")
         except b2sdk.exception.BadRequest:
             # if attempt<retry:
             #     self._download_by_id(id, output, retry=retry, attempt=attempt+1)
@@ -225,14 +237,37 @@ class BackBlazeStorage(BaseStorage):
                 f"Failed to download file id {id}, raise b2sdk.exception.BadRequest Exception"
             )
         except b2sdk.exception.ChecksumMismatch as e:
-            logger.error(
-                f"{str(e)}"
-            )
+            logger.error(f"{str(e)}")
             raise e
         except requests.ReadTimeout:
             logger.error("Timeout")
             raise requests.ReadTimeout("Timeout")
         return output
+
+    def load(self, id, skip_not_found=False):
+        try:
+            download_file = self.bucket.download_file_by_id(
+                file_id=id,
+            )
+            file = io.BytesIO()
+            download_file.save(file)
+            return download_file
+        except b2sdk.exception.FileNotPresent:
+            if skip_not_found:
+                logger.error(f"File id: {id} not found in backblaze")
+            else:
+                raise StorageFileNotFound(f"File id: {id} not found in backblaze")
+        except b2sdk.exception.BadRequest:
+            logger.error(
+                f"Failed to download file id {id}, raise b2sdk.exception.BadRequest Exception"
+            )
+        except b2sdk.exception.ChecksumMismatch as e:
+            logger.error(f"{str(e)}")
+            raise e
+        except requests.ReadTimeout:
+            logger.error("Timeout")
+            raise requests.ReadTimeout("Timeout")
+        return file
 
     def list_files(self, key):
         list_files = []

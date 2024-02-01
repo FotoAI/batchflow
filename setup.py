@@ -12,7 +12,7 @@ HERE = os.path.abspath(os.path.dirname(__file__))
 with open(os.path.join(HERE, "README.md")) as fid:
     README = fid.read()
 
-__version__ = None  # set __version__ in this exec() call
+__version__ = "1.1.1"  # set __version__ in this exec() call
 exec(open("batchflow/version.py").read())
 # This call to setup() does all the work
 
@@ -39,6 +39,7 @@ setup(
         "catalogue==2.0.0",
         "boto3>=1.12.18",
         "tenacity>=8.0.0",
-        "b2sdk==1.21.0"
+        "b2sdk==1.21.0",
+        "boto3==1.34.32",
     ],
 )
