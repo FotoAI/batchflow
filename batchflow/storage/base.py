@@ -36,3 +36,7 @@ class BaseStorage:
     @abstractmethod
     def upload(self):
         NotImplementedError("Implement this method in subclass")
+
+    @abstractmethod
+    def load(self):
+        NotImplementedError("Implement this method in subclass")
