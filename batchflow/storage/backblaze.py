@@ -251,7 +251,7 @@ class BackBlazeStorage(BaseStorage):
             )
             file = io.BytesIO()
             download_file.save(file)
-            return download_file
+            return file
         except b2sdk.exception.FileNotPresent:
             if skip_not_found:
                 logger.error(f"File id: {id} not found in backblaze")
