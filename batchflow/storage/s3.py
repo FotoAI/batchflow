@@ -41,13 +41,17 @@ class S3(BaseStorage):
             self.s3_client.download_file(self.bucket_name, key, output)
             return output
         except botocore.exceptions.ClientError as e:
-            logger.error(e.response["Error"]["Code"])
-            if skip_not_found:
-                logger.error(f"File s3://{self.bucket_name}/{key} not found in aws s3")
-            else:
-                raise StorageFileNotFound(
-                    f"File s3://{self.bucket_name}/{key} not found in aws s3"
-                )
+            error_code = e.response["Error"]["Code"]
+            logger.error(error_code)
+            if error_code == "404":
+                if skip_not_found:
+                    logger.error(
+                        f"File s3://{self.bucket_name}/{key} not found in aws s3"
+                    )
+                else:
+                    raise StorageFileNotFound(
+                        f"File s3://{self.bucket_name}/{key} not found in aws s3"
+                    )
         except Exception as e:
             logger.error(e)
             raise e
@@ -65,13 +69,17 @@ class S3(BaseStorage):
             object_content = s3_response_object["Body"].read()
             return io.BytesIO(object_content)
         except botocore.exceptions.ClientError as e:
-            logger.error(e.response["Error"]["Code"])
-            if skip_not_found:
-                logger.error(f"File s3://{self.bucket_name}/{key} not found in aws s3")
-            else:
-                raise StorageFileNotFound(
-                    f"File s3://{self.bucket_name}/{key} not found in aws s3"
-                )
+            error_code = e.response["Error"]["Code"]
+            logger.error(error_code)
+            if error_code == "404":
+                if skip_not_found:
+                    logger.error(
+                        f"File s3://{self.bucket_name}/{key} not found in aws s3"
+                    )
+                else:
+                    raise StorageFileNotFound(
+                        f"File s3://{self.bucket_name}/{key} not found in aws s3"
+                    )
         except Exception as e:
             logger.error(e)
             raise e
