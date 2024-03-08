@@ -49,7 +49,6 @@ class S3(BaseStorage):
                         f"File s3://{self.bucket_name}/{key} not found in aws s3"
                     )
                 else:
-                    logger.error(f"{key} error_code: {error_code}")
                     raise StorageFileNotFound(
                         f"File s3://{self.bucket_name}/{key} not found in aws s3"
                     )
