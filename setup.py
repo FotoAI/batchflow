@@ -31,9 +31,9 @@ setup(
     include_package_data=True,
     install_requires=[
         "numpy==1.26.4",
-        "opencv-python-headless==4.10.0.84",
+        # "opencv-python-headless==4.10.0.84",
         "loguru==0.5.3",
-        "Pillow==10.4.0",
+        # "Pillow==10.4.0",
         "requests==2.32.3",
         "catalogue==2.0.0",
         "tenacity==8.5.0",
