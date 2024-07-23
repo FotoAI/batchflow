@@ -31,8 +31,16 @@ class S3(BaseStorage):
     def __init__(
         self,
         bucket_name: str,
+        endpoint_url=None,
+        aws_access_key_id=None,
+        aws_secret_access_key=None,
     ):
-        self.s3_client = boto3.client("s3")
+        self.s3_client = boto3.client(
+            "s3",
+            endpoint_url=endpoint_url,
+            aws_access_key_id=aws_access_key_id,
+            aws_secret_access_key=aws_secret_access_key,
+        )
         self.bucket_name = bucket_name
 
     # @download_retry
