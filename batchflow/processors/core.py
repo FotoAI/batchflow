@@ -5,6 +5,8 @@ import numpy as np
 from batchflow.core.node import ProcessorNode
 from batchflow.storage import get_storage
 from batchflow.storage.base import BaseStorage
+from batchflow.constants import BATCHFLOW_HOME
+import os
 
 
 class ModelProcessor(ProcessorNode):
@@ -12,6 +14,7 @@ class ModelProcessor(ProcessorNode):
         self,
         model_path: str = None,
         model_source: Dict[str, str] = None,
+        model_root: str = None,
         *args,
         **kwargs,
     ) -> None:
@@ -31,10 +34,13 @@ class ModelProcessor(ProcessorNode):
                 filename: str local filepath with name after download
         """
         super().__init__(*args, **kwargs)
+        self.model_root = model_root or BATCHFLOW_HOME
         if model_path is not None:
             self.model_path = model_path
         elif model_source is not None:
-            self.model_path = self.download_model(model_source)
+            self.model_path = self.download_model(
+                model_source, model_root=self.model_root
+            )
         self.model = None
 
     def preprocess(self, image: np.asarray):
@@ -48,7 +54,7 @@ class ModelProcessor(ProcessorNode):
     def predict(self, input: Any):
         raise NotImplemented("Implement this to predict model output in subclass")
 
-    def download_model(self, model_source: Dict[str, str]) -> str:
+    def download_model(self, model_source: Dict[str, str], model_root: str) -> str:
         source: str = model_source["source"].lower()
         if source == "backblaze":
             bucket_name = model_source["bucket_name"]
@@ -67,6 +73,13 @@ class ModelProcessor(ProcessorNode):
             url = model_source.get("url", None)
             filename: str = model_source.get("filename")
             model_path = storage.download(id=id, url=url, filename=filename)
+        elif source == "s3":
+            storage: BaseStorage = get_storage("s3")
+            # id = model_source.get("id", None)
+            model_key: str = model_source["key"]
+            filename: str = model_source.get("filename")
+            output = os.path.join(model_root, filename)
+            model_path = storage.download(output, key=model_key)
         else:
             raise Exception(f"Storage {source} not supported for model download")
 

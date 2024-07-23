@@ -200,7 +200,7 @@ class BackBlazeStorage(BaseStorage):
             downloaded_file.save_to(output)
         except b2sdk.exception.FileNotPresent:
             if skip_not_found:
-                logger.error(f"File id: {id} not found in backblaze")
+                logger.warning(f"File id: {id} not found in backblaze")
             else:
                 raise StorageFileNotFound(
                     f"File b2://{self.bucket_name}/{key} not found in backblaze"
@@ -252,6 +252,7 @@ class BackBlazeStorage(BaseStorage):
             file = io.BytesIO()
             download_file.save(file)
             return file
+
         except b2sdk.exception.FileNotPresent:
             if skip_not_found:
                 logger.error(f"File id: {id} not found in backblaze")
@@ -267,7 +268,6 @@ class BackBlazeStorage(BaseStorage):
         except requests.ReadTimeout:
             logger.error("Timeout")
             raise requests.ReadTimeout("Timeout")
-        return file
 
     def list_files(self, key):
         list_files = []
