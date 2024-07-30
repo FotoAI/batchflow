@@ -77,7 +77,6 @@ class S3(BaseStorage):
             return io.BytesIO(object_content)
         except botocore.exceptions.ClientError as e:
             error_code = e.response["Error"]["Code"]
-            logger.error(error_code)
             if error_code == "NoSuchKey" or error_code == "404":
                 if skip_not_found:
                     logger.warning(
