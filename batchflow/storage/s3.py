@@ -35,12 +35,14 @@ class S3(BaseStorage):
         aws_access_key_id=None,
         aws_secret_access_key=None,
     ):
+        logger.info(f"Initializing S3 storage for bucket: {bucket_name} with endpoint: {endpoint_url}")
         self.s3_client = boto3.client(
             "s3",
             endpoint_url=endpoint_url,
             aws_access_key_id=aws_access_key_id,
             aws_secret_access_key=aws_secret_access_key,
         )
+        
         self.bucket_name = bucket_name
 
     # @download_retry
