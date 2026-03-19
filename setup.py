@@ -37,7 +37,7 @@ setup(
         "requests==2.32.3",
         "catalogue==2.0.0",
         "tenacity==8.5.0",
-        "b2sdk==1.21.0",
+        "b2sdk==2.10.4",
         "boto3==1.34.32",
     ],
 )
