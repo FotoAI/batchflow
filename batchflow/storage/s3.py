@@ -44,11 +44,10 @@ class S3(BaseStorage):
             error_code = e.response["Error"]["Code"]
 
             if error_code == "NoSuchKey" or error_code == "404":
-                if skip_not_found:
-                    logger.error(
-                        f"File s3://{self.bucket_name}/{key} not found in aws s3"
-                    )
-                else:
+                logger.warning(
+                    f"File s3://{self.bucket_name}/{key} not found in aws s3"
+                )
+                if not skip_not_found:
                     raise StorageFileNotFound(
                         f"File s3://{self.bucket_name}/{key} not found in aws s3"
                     )
@@ -70,16 +69,16 @@ class S3(BaseStorage):
             return io.BytesIO(object_content)
         except botocore.exceptions.ClientError as e:
             error_code = e.response["Error"]["Code"]
-            logger.error(error_code)
             if error_code == "NoSuchKey" or error_code == "404":
-                if skip_not_found:
-                    logger.error(
-                        f"File s3://{self.bucket_name}/{key} not found in aws s3"
-                    )
-                else:
+                logger.warning(
+                    f"File s3://{self.bucket_name}/{key} not found in aws s3"
+                )
+                if not skip_not_found:
                     raise StorageFileNotFound(
                         f"File s3://{self.bucket_name}/{key} not found in aws s3"
                     )
+            else:
+                logger.error(error_code)
         except Exception as e:
             logger.error(e)
             raise e

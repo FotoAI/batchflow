@@ -104,3 +104,4 @@ ENV/
 .vscode/
 test.py
 *.jpg
+**/.DS_Store
